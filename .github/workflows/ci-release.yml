@@ -1,0 +1,93 @@
+name: Checks and release
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Shell checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Run project checks
+        run: make check
+
+  package:
+    name: Build Arch package
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Build package in Arch Linux
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace \
+            archlinux:latest \
+            bash -euo pipefail -c '
+              pacman -Syu --noconfirm --needed base-devel
+              useradd --create-home builder
+              install -d -o builder -g builder /workspace/dist
+              su builder -s /bin/bash -c \
+                "cd /workspace/packaging/updater && PKGDEST=/workspace/dist BUILDDIR=/tmp/chatgpt-arch-updater-build makepkg --nodeps --cleanbuild --force --noconfirm"
+            '
+
+      - name: Verify version tag matches package
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          pkgver=$(sed -n 's/^pkgver=//p' packaging/updater/PKGBUILD)
+          pkgrel=$(sed -n 's/^pkgrel=//p' packaging/updater/PKGBUILD)
+          expected="v${pkgver}-${pkgrel}"
+          if [[ "$RELEASE_TAG" != "$expected" ]]; then
+            printf 'Release tag %s does not match PKGBUILD version %s\n' "$RELEASE_TAG" "$expected" >&2
+            exit 1
+          fi
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-arch-updater-package
+          path: dist/*.pkg.tar.*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish versioned release
+    runs-on: ubuntu-latest
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chatgpt-arch-updater-package
+          path: dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" dist/*.pkg.tar.* \
+            --title "ChatGPT Arch Updater $RELEASE_TAG" \
+            --generate-notes

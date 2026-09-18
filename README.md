@@ -59,3 +59,7 @@ sudo pacman -Syu --needed chatgpt-bin
 When a new package is ready, the notification's **Open help** action opens a terminal and shows `chatgpt-arch-updater --help`. After a successful `--install`, the updater asks whether to restart ChatGPT so the updated version is loaded. Answering yes closes and relaunches a running app, or opens the app if it was not running; the default is no. The notification helper looks for common terminal emulators or uses `CHATGPT_ARCH_UPDATER_TERMINAL`/`TERMINAL` if set. Notification actions depend on desktop notification support; without action support, the updater sends a regular notification.
 
 This is alpha software. Review the package contents and dependency report before installing. Debian dependency version constraints are not translated into pacman version constraints; mapped Arch package names are included as runtime dependencies, and discrepancies are clearly reported.
+
+## Continuous integration and releases
+
+GitHub Actions runs `make check` on every push and pull request, then builds the updater package in an Arch Linux environment and saves it as a workflow artifact. To publish a versioned release, update `pkgver` or `pkgrel` in `packaging/updater/PKGBUILD`, commit the change, create a matching tag in the form `v<pkgver>-<pkgrel>` (for example, `v0.1.0-7`), and push the tag. The workflow verifies that the tag matches the package version and attaches the built `.pkg.tar.zst` to the GitHub release.
