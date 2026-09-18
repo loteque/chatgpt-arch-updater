@@ -52,7 +52,7 @@ jobs:
               useradd --create-home builder
               install -d -o builder -g builder /workspace/dist
               su builder -s /bin/bash -c \
-                "cd /workspace/packaging/updater && PKGDEST=/workspace/dist BUILDDIR=/tmp/chatgpt-arch-updater-build makepkg --nodeps --cleanbuild --force --noconfirm"
+                "cd /workspace/packaging/updater && PKGDEST=/workspace/dist BUILDDIR=/tmp/chatgpt-arch-updater-build SRCDEST=/tmp/chatgpt-arch-updater-sources makepkg --nodeps --cleanbuild --force --noconfirm"
             '
 
       - name: Verify version tag matches package
