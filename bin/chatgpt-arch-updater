@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${CHATGPT_ARCH_UPDATER_LIBDIR:-}" ]]; then
+  LIBDIR=$CHATGPT_ARCH_UPDATER_LIBDIR
+elif [[ -d "$(dirname -- "${BASH_SOURCE[0]}")/../lib/chatgpt_arch_updater" ]]; then
+  LIBDIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib/chatgpt_arch_updater" && pwd)"
+elif [[ -d /usr/lib/chatgpt-arch-updater ]]; then
+  LIBDIR=/usr/lib/chatgpt-arch-updater
+elif [[ -d "${HOME}/.local/lib/chatgpt-arch-updater" ]]; then
+  LIBDIR="${HOME}/.local/lib/chatgpt-arch-updater"
+else
+  LIBDIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib/chatgpt_arch_updater" && pwd)"
+fi
+export CHATGPT_ARCH_UPDATER_LIBDIR="$LIBDIR"
+for module in common.sh arch-repository.sh dependencies.sh package.sh timer.sh; do
+  # shellcheck source=/dev/null
+  source "$LIBDIR/$module"
+done
+
+usage() {
+  cat <<'EOF'
+Usage: chatgpt-arch-updater [--check | --verchk | --pkgchk | --status | --dry-run | --install]
+
+  --check     Compare OpenAI's live Debian and signed Arch package versions;
+              offer an interactive package choice in a terminal.
+  --verchk    Compare live Debian/Arch versions with the installed app; exit 1 if current.
+  --pkgchk    Download, validate, and build the indexed package if needed.
+  --status    Show installed/upstream versions and package readiness.
+  --dry-run   Show actions that would be taken without changing anything.
+  --install   Build if needed, report dependencies, then explicitly install.
+  -t, --time  Set the user timer: Nh (1h-8760h), 1d, 1w, or 1m.
+  --help      Show this help.
+EOF
+}
+
+mode=--check
+if (($# > 0)); then mode=$1; fi
+if [[ "$mode" == -t || "$mode" == --time ]]; then
+  (($# == 2)) || { usage >&2; exit 2; }
+  set_check_interval "$2"
+  exit $?
+fi
+if (($# > 1)); then usage >&2; exit 2; fi
+
+case "$mode" in
+  --help|-h) usage ;;
+  --status) show_status ;;
+  --dry-run) do_dry_run ;;
+  --check) check_and_build ;;
+  --verchk)
+    if version_check; then exit 0; else exit $?; fi
+    ;;
+  --pkgchk) pkg_check ;;
+  --install) explicit_install ;;
+  *) usage >&2; exit 2 ;;
+esac

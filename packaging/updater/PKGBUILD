@@ -1,0 +1,27 @@
+pkgname=chatgpt-arch-updater
+pkgver=0.1.0
+pkgrel=7
+pkgdesc='Scheduled updater that repackages OpenAI ChatGPT official Debian release for Arch Linux'
+arch=('any')
+url='https://chatgpt.com/'
+license=('MIT')
+depends=('bash' 'curl' 'dpkg' 'gnupg' 'libarchive' 'pacman' 'systemd')
+optdepends=('libnotify: desktop notification when an updated package is ready')
+options=('!strip')
+
+package() {
+  local root="$startdir/../.."
+  install -Dm755 "$root/bin/chatgpt-arch-updater" \
+    "$pkgdir/usr/bin/chatgpt-arch-updater"
+  install -d "$pkgdir/usr/lib/chatgpt-arch-updater"
+  install -m644 "$root"/lib/chatgpt_arch_updater/*.sh \
+    "$pkgdir/usr/lib/chatgpt-arch-updater/"
+  install -d "$pkgdir/usr/lib/systemd/user"
+  sed 's|%h/.local/bin/chatgpt-arch-updater|/usr/bin/chatgpt-arch-updater|' \
+    "$root/systemd/user/chatgpt-arch-updater.service" \
+    >"$pkgdir/usr/lib/systemd/user/chatgpt-arch-updater.service"
+  install -Dm644 "$root/systemd/user/chatgpt-arch-updater.timer" \
+    "$pkgdir/usr/lib/systemd/user/chatgpt-arch-updater.timer"
+  install -Dm644 "$root/LICENSE" \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

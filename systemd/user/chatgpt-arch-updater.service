@@ -1,0 +1,6 @@
+[Unit]
+Description=Check for and build the official ChatGPT Arch package
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/chatgpt-arch-updater --check
